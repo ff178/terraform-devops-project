@@ -1,15 +1,31 @@
 output "vpc_id" {
-  value = module.vpc.vpc_id
+  value = module.project.vpc_id
 }
 
 output "public_subnets" {
-  value = module.vpc.public_subnets
+  value = module.project.public_subnets
 }
 
 output "private_subnets" {
-  value = module.vpc.private_subnets
+  value = module.project.private_subnets
 }
 
 output "nat_gateway_ids" {
-  value = module.vpc.nat_gateway_ids
+  value = module.project.nat_gateway_ids
+}
+
+output "alb_dns_name" {
+  value = module.project.alb_dns_name
+}
+
+output "asg_name" {
+  value = module.project.asg_name
+}
+
+output "db_endpoint" {
+  value = module.project.db_endpoint
+}
+
+output "db_name" {
+  value = module.project.db_name
 }
