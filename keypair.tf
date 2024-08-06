@@ -1,4 +1,5 @@
-resource "aws_key_pair" "ff" {
-  key_name   = var.key_name
-  public_key = var.key
-}
+# Define Keypair 
+# resource "aws_key_pair" "ff" {
+#   key_name   = var.key_name
+#   public_key = var.key
+# }
