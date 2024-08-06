@@ -1,23 +1,15 @@
-# Output vpc id
 output "vpc_id" {
-    value = aws_vpc.main.id
+  value = module.vpc.vpc_id
 }
 
-# Output vpc cidr
-output "vpc_cidr" {
-    value = aws_vpc.main.cidr_block
+output "public_subnets" {
+  value = module.vpc.public_subnets
 }
 
-# Output  public subnets ids
-output "public_subnet_ids" {
-    value = aws_subnet.public[*].id
+output "private_subnets" {
+  value = module.vpc.private_subnets
 }
 
-# Output  private subnets ids
-output "private_subnet_ids" {
-    value = aws_subnet.private[*].id
+output "nat_gateway_ids" {
+  value = module.vpc.nat_gateway_ids
 }
-
-# # output "instance_ids" {
-# #     value = aws_instance.example[*].id
-# # }
