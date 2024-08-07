@@ -17,15 +17,17 @@ resource "aws_internet_gateway" "main" {
 }
 
 resource "aws_subnet" "public" {
-  count                   = var.public_subnets_count
+  count                   = 3
   vpc_id                  = aws_vpc.main.id
   cidr_block              = element(var.public_subnets_cidr, count.index)
   map_public_ip_on_launch = true
+  availability_zone       = element(data.aws_availability_zones.available.names, count.index)
 
   tags = {
-    Name = "${var.vpc_name}-public-subnet-${count.index + 1}"
+    Name = "${var.vpc_name}-public-subnet-${count.index}"
   }
 }
+
 
 resource "aws_subnet" "private" {
   count      = var.private_subnets_count
@@ -157,14 +159,19 @@ resource "aws_lb" "wordpress_alb" {
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = aws_subnet.public.*.id
-
+  subnets            = [
+    aws_subnet.public[0].id,  # Subnet in AZ 1
+    aws_subnet.public[1].id,  # Subnet in AZ 2
+    aws_subnet.public[2].id   # Subnet in AZ 3
+  ]
+  
   enable_deletion_protection = false
 
   tags = {
     Name = "${var.vpc_name}-wordpress-alb"
   }
 }
+
 
 resource "aws_security_group" "alb_sg" {
   vpc_id = aws_vpc.main.id
@@ -218,16 +225,16 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-resource "aws_route53_record" "wordpress" {
-  zone_id = var.hosted_zone_id
-  name    = "wordpress.${var.domain_name}"
-  type    = "A"
-  alias {
-    name                   = aws_lb.wordpress_alb.dns_name
-    zone_id                = aws_lb.wordpress_alb.zone_id
-    evaluate_target_health = true
-  }
-}
+# resource "aws_route53_record" "wordpress" {
+#   zone_id = var.hosted_zone_id
+#   name    = "wordpress.${var.domain_name}"
+#   type    = "A"
+#   alias {
+#     name                   = aws_lb.wordpress_alb.dns_name
+#     zone_id                = aws_lb.wordpress_alb.zone_id
+#     evaluate_target_health = true
+#   }
+# }
 
 #DATABASE--------DATABASE#
 resource "aws_db_subnet_group" "wordpress_db_subnet_group" {
