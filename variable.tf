@@ -62,7 +62,7 @@ variable "db_username" {
 
 variable "db_password" {
   type = string
-  default = "admin"
+  default = "adminpassword"
 }
 
 variable "db_instance_class" {

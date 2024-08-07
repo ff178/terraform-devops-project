@@ -100,7 +100,7 @@ resource "aws_launch_template" "wordpress" {
   instance_type = var.instance_type
   key_name      = var.ssh_key_name
 
-  user_data = <<-EOF
+  user_data = base64encode(<<-EOF
     #!/bin/bash
     sudo apt-get update
     sudo apt-get install -y apache2 php php-mysql
@@ -116,6 +116,7 @@ resource "aws_launch_template" "wordpress" {
     echo "DB_HOST=${aws_db_instance.wordpress_db.address}" >> /etc/environment
     # Commands to set up WordPress could go here
   EOF
+  )
 
   tag_specifications {
     resource_type = "instance"
@@ -125,6 +126,7 @@ resource "aws_launch_template" "wordpress" {
     }
   }
 }
+
 
 
 resource "aws_autoscaling_group" "wordpress_asg" {
