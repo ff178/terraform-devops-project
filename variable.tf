@@ -42,12 +42,12 @@ variable "instance_type" {
 
 variable "hosted_zone_id" {
   type = string
-  default = "Z1234567890"
+  default = "Z09028151IHJX2FZKCYBL"
 }
 
 variable "domain_name" {
   type = string
-  default = "yourdomain.com"
+  default = "fabianfelipe.link"
 }
 
 variable "db_name" {
@@ -62,7 +62,7 @@ variable "db_username" {
 
 variable "db_password" {
   type = string
-  default = "adminpassword"
+  default = "Admin1234$"
 }
 
 variable "db_instance_class" {

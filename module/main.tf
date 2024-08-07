@@ -104,19 +104,86 @@ resource "aws_launch_template" "wordpress" {
 
   user_data = base64encode(<<-EOF
     #!/bin/bash
-    sudo apt-get update
-    sudo apt-get install -y apache2 php php-mysql
-    sudo systemctl start apache2
-    sudo systemctl enable apache2
-    export DB_NAME=${var.db_name}
-    export DB_USER=${var.db_username}
-    export DB_PASSWORD=${var.db_password}
-    export DB_HOST=${aws_db_instance.wordpress_db.address}
-    echo "DB_NAME=${var.db_name}" >> /etc/environment
-    echo "DB_USER=${var.db_username}" >> /etc/environment
-    echo "DB_PASSWORD=${var.db_password}" >> /etc/environment
-    echo "DB_HOST=${aws_db_instance.wordpress_db.address}" >> /etc/environment
-    # Commands to set up WordPress could go here
+    # Update package repository
+    sudo yum update -y
+
+    # Add the MySQL 5.7 repository
+    sudo yum install -y https://dev.mysql.com/get/mysql57-community-release-el7-11.noarch.rpm
+
+    #Import GPG KEY
+    sudo rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2022
+    
+    #Install MySQL server
+    sudo yum install -y mysql-community-server
+
+     # Install Apache, PHP, and related packages
+    sudo yum install -y httpd php php-mysqlnd php-fpm
+
+    # Start and enable Apache and MySQL services
+    sudo systemctl start httpd
+    sudo systemctl enable httpd
+    sudo systemctl start mysqld
+    sudo systemctl enable mysqld
+
+    #Set root password
+    sudo systemctl stop mysqld
+    sudo mysqld_safe --skip-grant-tables &
+    mysql -u root
+    ALTER USER 'root'@'localhost' IDENTIFIED BY '${var.db_password}';
+    FLUSH PRIVILEGES;
+    EXIT;
+    sudo killall mysqld_safe
+    sudo systemctl start mysqld
+
+    #Timeout for db start
+    sleep 30
+
+    # Create WordPress database and user
+    DB_NAME=${var.db_name}
+    DB_USER=${var.db_username}
+    DB_PASSWORD=${var.db_password}
+
+    sudo mysql -u root -p'${var.db_password}' -e "CREATE DATABASE ${var.db_name};"
+    sudo mysql -u root -p'${var.db_password}' -e "CREATE USER '${var.db_username}'@'localhost' IDENTIFIED BY '${var.db_password}';"
+    sudo mysql -u root -p'${var.db_password}' -e "GRANT ALL PRIVILEGES ON ${var.db_name}.* TO '${var.db_username}'@'localhost';"
+    sudo mysql -u root -p'${var.db_password}' -e "FLUSH PRIVILEGES;"
+
+    # Download and configure WordPress
+    cd /var/www/html
+    sudo wget https://wordpress.org/latest.tar.gz
+    sudo tar -xzf latest.tar.gz
+    sudo rm -f latest.tar.gz
+    sudo cp wordpress/wp-config-sample.php wordpress/wp-config.php
+
+    # Update wp-config.php with database details
+    sudo sed -i "s/database_name_here/${var.db_name}/" wordpress/wp-config.php
+    sudo sed -i "s/username_here/${var.db_username}/" wordpress/wp-config.php
+    sudo sed -i "s/password_here/${var.db_password}/" wordpress/wp-config.php
+
+    # Set appropriate permissions
+    sudo chown -R apache:apache /var/www/html/wordpress
+    sudo chmod -R 755 /var/www/html/wordpress
+
+    # Configure Apache to serve WordPress
+    sudo tee /etc/httpd/conf.d/wordpress.conf > /dev/null <<-CONFIG_EOF
+    <VirtualHost *:80>
+        DocumentRoot "/var/www/html/wordpress"
+        <Directory "/var/www/html/wordpress">
+            AllowOverride All
+            Require all granted
+        </Directory>
+    </VirtualHost>
+    CONFIG_EOF
+
+    # Restart Apache to apply changes
+    sudo systemctl restart httpd
+
+    # Output the details for WordPress setup
+    echo "WordPress has been installed!"
+    echo "Database Name: ${var.db_name}"
+    echo "Database User: ${var.db_username}"
+    echo "Database Password: ${var.db_password}"
+ 
   EOF
   )
 
@@ -195,6 +262,30 @@ resource "aws_security_group" "alb_sg" {
   }
 }
 
+resource "aws_security_group" "allow_ssh" {
+  name        = "allow_ssh"
+  description = "Allow SSH inbound traffic"
+  vpc_id = aws_vpc.main.id
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "allow_ssh"
+  }
+}
+
 resource "aws_lb_target_group" "wordpress_tg" {
   name     = "${var.vpc_name}-wordpress-tg"
   port     = 80
@@ -225,16 +316,16 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-# resource "aws_route53_record" "wordpress" {
-#   zone_id = var.hosted_zone_id
-#   name    = "wordpress.${var.domain_name}"
-#   type    = "A"
-#   alias {
-#     name                   = aws_lb.wordpress_alb.dns_name
-#     zone_id                = aws_lb.wordpress_alb.zone_id
-#     evaluate_target_health = true
-#   }
-# }
+resource "aws_route53_record" "wordpress" {
+  zone_id = var.hosted_zone_id
+  name    = "wordpress.${var.domain_name}"
+  type    = "A"
+  alias {
+    name                   = aws_lb.wordpress_alb.dns_name
+    zone_id                = aws_lb.wordpress_alb.zone_id
+    evaluate_target_health = true
+  }
+}
 
 #DATABASE--------DATABASE#
 resource "aws_db_subnet_group" "wordpress_db_subnet_group" {
