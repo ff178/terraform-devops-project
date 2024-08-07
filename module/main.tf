@@ -94,13 +94,137 @@ resource "aws_route_table_association" "private" {
   route_table_id = element(aws_route_table.private.*.id, count.index)
 }
 
+#Security Groups
+
+# Security Group for the ALB
+resource "aws_security_group" "alb_sg" {
+  name        = "alb-sg"
+  description = "Security group for Application Load Balancer"
+  vpc_id      = aws_vpc.main.id 
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # Allows HTTP traffic from anywhere
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # Allows HTTPS traffic from anywhere
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"] # Allows all outbound traffic
+  }
+
+  tags = {
+    Name = "${var.vpc_name}-alb-sg"
+  }
+}
+
+# Security Group for the EC2 instances
+resource "aws_security_group" "ec2_sg" {
+  name        = "ec2-sg"
+  description = "Security group for EC2 instances"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    security_groups = [aws_security_group.alb_sg.id] # Allow traffic from ALB
+  }
+
+  ingress {
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # Allows HTTPS traffic from anywhere
+    # security_groups = [aws_security_group.db_sg.id] # Allow traffic to DB
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"] # Allows all outbound traffic
+  }
+
+  tags = {
+    Name = "${var.vpc_name}-ec2-sg"
+  }
+}
+
+# Security Group for the Database
+resource "aws_security_group" "db_sg" {
+  name        = "db-sg"
+  description = "Security group for the database"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    security_groups = [aws_security_group.ec2_sg.id] # Allow traffic from EC2 instances
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"] # Allows all outbound traffic
+  }
+
+  tags = {
+    Name = "${var.vpc_name}-db-sg"
+  }
+}
+
+resource "aws_security_group" "allow_ssh" {
+  name        = "allow_ssh"
+  description = "Allow SSH inbound traffic"
+  vpc_id = aws_vpc.main.id
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.vpc_name}-ssh"
+  }
+}
+
 
 #ASG--------ASG#
 resource "aws_launch_template" "wordpress" {
   name_prefix   = "${var.vpc_name}-wordpress"
   image_id      = var.ami_id
   instance_type = var.instance_type
+
+  network_interfaces {
+    associate_public_ip_address = true
+    subnet_id                   = aws_subnet.public[0].id
+    security_groups             = [aws_security_group.ec2_sg.id, aws_security_group.allow_ssh.id]
+  }
+
   key_name      = var.ssh_key_name
+ 
 
   user_data = base64encode(<<-EOF
     #!/bin/bash
@@ -139,9 +263,10 @@ resource "aws_launch_template" "wordpress" {
     sleep 30
 
     # Create WordPress database and user
-    DB_NAME=${var.db_name}
-    DB_USER=${var.db_username}
-    DB_PASSWORD=${var.db_password}
+    DB_NAME="${var.db_name}"
+    DB_USER="${var.db_username}"
+    DB_PASSWORD="${var.db_password}"
+    DB_HOST="${aws_db_instance.wordpress_db.endpoint}"
 
     sudo mysql -u root -p'${var.db_password}' -e "CREATE DATABASE ${var.db_name};"
     sudo mysql -u root -p'${var.db_password}' -e "CREATE USER '${var.db_username}'@'localhost' IDENTIFIED BY '${var.db_password}';"
@@ -159,6 +284,7 @@ resource "aws_launch_template" "wordpress" {
     sudo sed -i "s/database_name_here/${var.db_name}/" wordpress/wp-config.php
     sudo sed -i "s/username_here/${var.db_username}/" wordpress/wp-config.php
     sudo sed -i "s/password_here/${var.db_password}/" wordpress/wp-config.php
+    sudo sed -i "s/localhost/${aws_db_instance.wordpress_db.endpoint}/" wordpress/wp-config.php
 
     # Set appropriate permissions
     sudo chown -R apache:apache /var/www/html/wordpress
@@ -195,8 +321,6 @@ resource "aws_launch_template" "wordpress" {
     }
   }
 }
-
-
 
 resource "aws_autoscaling_group" "wordpress_asg" {
   vpc_zone_identifier = aws_subnet.public.*.id
@@ -236,53 +360,6 @@ resource "aws_lb" "wordpress_alb" {
 
   tags = {
     Name = "${var.vpc_name}-wordpress-alb"
-  }
-}
-
-
-resource "aws_security_group" "alb_sg" {
-  vpc_id = aws_vpc.main.id
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "${var.vpc_name}-alb-sg"
-  }
-}
-
-resource "aws_security_group" "allow_ssh" {
-  name        = "allow_ssh"
-  description = "Allow SSH inbound traffic"
-  vpc_id = aws_vpc.main.id
-
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "allow_ssh"
   }
 }
 
@@ -355,26 +432,3 @@ resource "aws_db_instance" "wordpress_db" {
     Name = "${var.vpc_name}-wordpress-db"
   }
 }
-
-resource "aws_security_group" "db_sg" {
-  vpc_id = aws_vpc.main.id
-
-  ingress {
-    from_port   = 3306
-    to_port     = 3306
-    protocol    = "tcp"
-    cidr_blocks = [aws_vpc.main.cidr_block]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "${var.vpc_name}-db-sg"
-  }
-}
-
