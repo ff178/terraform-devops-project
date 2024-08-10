@@ -35,6 +35,12 @@ On top of the VPC from Step 1, we create an Auto Scaling Group:
   - The ALB is accessible via a custom domain, e.g., `wordpress.yourdomain.com`.
   - DNS records are created in a Route 53 hosted zone.
 
+**Verification**:
+1. Verify everything was created property in AWS console.
+2. Verify ALB is working property by DNS name.
+3. Verify DNS record by the link `wordpress.yourdomain.com`
+
+
 ### Step 3: RDS Cluster
 
 Create a highly available RDS Cluster:
@@ -49,3 +55,11 @@ Create a highly available RDS Cluster:
     - `reader2.yourdomain.com`
     - `reader3.yourdomain.com`
 
+**Verification**:
+1. Verify the RDS Cluster is created property in AWS console
+2. Verify the connectivity to the RDS Cluster by DB Client.
+3. Verify DNS records by the links:
+    - `writer.yourdomain.com`
+    - `reader1.yourdomain.com`
+    - `reader2.yourdomain.com`
+    - `reader3.yourdomain.com`
