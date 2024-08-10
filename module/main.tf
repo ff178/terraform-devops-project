@@ -210,6 +210,30 @@ resource "aws_security_group" "allow_ssh" {
   }
 }
 
+resource "aws_security_group" "rds_cluster" {
+  name        = "rds_cluster"
+  description = "rds_cluster sg"
+  vpc_id = aws_vpc.main.id
+
+  ingress {
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.vpc_name}-rds_cluster"
+  }
+}
+
 
 #ASG--------ASG#
 resource "aws_launch_template" "wordpress" {
@@ -371,10 +395,11 @@ resource "aws_lb_target_group" "wordpress_tg" {
 
   health_check {
     path                = "/"
-    interval            = 30
-    timeout             = 5
-    healthy_threshold   = 5
-    unhealthy_threshold = 2
+    interval            = 60
+    timeout             = 50
+    healthy_threshold   = 2
+    unhealthy_threshold = 5
+    matcher             = "302"
   }
 
   tags = {
@@ -431,4 +456,60 @@ resource "aws_db_instance" "wordpress_db" {
   tags = {
     Name = "${var.vpc_name}-wordpress-db"
   }
+}
+
+
+
+# RDS Cluster
+resource "aws_db_subnet_group" "cluster_db_subnet_group" {
+  name       = var.db_subnet_group_name_cluster
+  subnet_ids = aws_subnet.private.*.id
+
+  tags = {
+    Name = "${var.vpc_name}-db-cluster-subnet-group"
+  }
+}
+
+resource "aws_rds_cluster" "rds_cluster" {
+  cluster_identifier      = var.cluster_identifier
+  engine                  = var.engine_cluster
+  engine_version          = var.engine_version_cluster
+  database_name           = var.database_name_cluster
+  master_username         = var.master_username_cluster
+  master_password         = var.master_password_cluster
+  backup_retention_period = var.backup_retention_period
+  preferred_backup_window = var.preferred_backup_window
+  vpc_security_group_ids  = [aws_security_group.rds_cluster.id]
+  db_subnet_group_name    = aws_db_subnet_group.cluster_db_subnet_group.name
+  skip_final_snapshot     = var.skip_final_snapshot
+  final_snapshot_identifier = "my-rds-cluster-final-snapshot-${formatdate("20060102150405", timestamp())}"
+
+  tags = var.tags
+}
+
+# RDS Cluster Writer Instance
+resource "aws_rds_cluster_instance" "writer" {
+  identifier               = "${var.cluster_identifier}-writer"
+  cluster_identifier       = aws_rds_cluster.rds_cluster.id
+  instance_class           = var.instance_class_cluster
+  engine                   = aws_rds_cluster.rds_cluster.engine
+  engine_version           = aws_rds_cluster.rds_cluster.engine_version
+  publicly_accessible      = var.publicly_accessible
+  db_subnet_group_name     = aws_db_subnet_group.cluster_db_subnet_group.name
+
+  tags = var.tags
+}
+
+# RDS Cluster Reader Instances
+resource "aws_rds_cluster_instance" "readers" {
+  count                    = 3
+  identifier               = "${var.cluster_identifier}-reader-${count.index + 1}"
+  cluster_identifier       = aws_rds_cluster.rds_cluster.id
+  instance_class           = var.instance_class_cluster
+  engine                   = aws_rds_cluster.rds_cluster.engine
+  engine_version           = aws_rds_cluster.rds_cluster.engine_version
+  publicly_accessible      = var.publicly_accessible
+  db_subnet_group_name     = aws_db_subnet_group.cluster_db_subnet_group.name
+
+  tags = var.tags
 }

@@ -29,3 +29,15 @@ output "db_endpoint" {
 output "db_name" {
   value = module.project.db_name
 }
+
+output "rds_cluster_id" {
+  value = module.project.rds_cluster_id
+}
+
+output "rds_writer_instance_id" {
+  value = module.project.rds_writer_instance_id
+}
+
+output "rds_reader_instance_ids" {
+  value = module.project.rds_reader_instance_ids
+}

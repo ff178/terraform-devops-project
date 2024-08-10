@@ -37,3 +37,19 @@ output "db_name" {
   description = "The name of the RDS database"
   value       = var.db_name
 }
+
+
+output "rds_cluster_id" {
+  description = "The RDS cluster identifier."
+  value       = aws_rds_cluster.rds_cluster.id
+}
+
+output "rds_writer_instance_id" {
+  description = "The writer RDS instance identifier."
+  value       = aws_rds_cluster_instance.writer.id
+}
+
+output "rds_reader_instance_ids" {
+  description = "The list of reader RDS instance identifiers."
+  value       = aws_rds_cluster_instance.readers[*].id
+}

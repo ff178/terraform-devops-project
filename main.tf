@@ -20,4 +20,20 @@ module "project" {
   db_allocated_storage  = 20
   db_engine             = var.db_engine
   db_engine_version     = var.db_engine_version
+  cluster_identifier     = "my-rds-cluster"
+  engine_cluster                 = "aurora-mysql"
+  engine_version_cluster         = "5.7.mysql_aurora.2.11.1"
+  database_name_cluster          = "mydb"
+  master_username_cluster        = "admin"
+  master_password_cluster        = "yourpassword"
+  backup_retention_period = 7
+  preferred_backup_window = "07:00-09:00"
+  db_subnet_group_name_cluster    = "my-db-subnet-group"
+  instance_class_cluster          = "db.r6g.large"
+  publicly_accessible     = false
+  skip_final_snapshot     = true
+  tags = {
+    Name = "my-rds-cluster"
+    Env  = "production"
+  }
 }

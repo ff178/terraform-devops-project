@@ -126,3 +126,97 @@ variable "environment_variables" {
     DB_HOST = "db.example.com"
   }
 }
+
+
+
+variable "cluster_identifier" {
+  description = "The identifier for the RDS cluster."
+  type        = string
+}
+
+variable "engine_cluster" {
+  description = "The name of the database engine to be used for this RDS cluster."
+  type        = string
+}
+
+variable "engine_version_cluster" {
+  description = "The version number of the database engine to use."
+  type        = string
+}
+
+variable "database_name_cluster" {
+  description = "The name of the database to create when the DB instance is created."
+  type        = string
+}
+
+variable "master_username_cluster" {
+  description = "The master username for the database."
+  type        = string
+}
+
+variable "master_password_cluster" {
+  description = "The master password for the database."
+  type        = string
+  sensitive   = true
+}
+
+variable "backup_retention_period" {
+  description = "The number of days to retain backups."
+  type        = number
+  default     = 7
+}
+
+variable "preferred_backup_window" {
+  description = "The daily time range during which automated backups are created."
+  type        = string
+  default     = "07:00-09:00"
+}
+
+
+variable "db_subnet_group_name_cluster" {
+  description = "The name of the DB subnet group to use for the RDS cluster."
+  type        = string
+}
+
+variable "instance_class_cluster" {
+  description = "The instance class to use for the RDS instances."
+  type        = string
+}
+
+variable "apply_immediately" {
+  description = "Whether any cluster modifications are applied immediately, or during the next maintenance window."
+  type        = bool
+  default     = false
+}
+
+# variable "availability_zones" {
+#   description = "A list of EC2 Availability Zones that instances in the DB cluster can be created in."
+#   type        = list(string)
+#   default     = []
+# }
+
+variable "storage_encrypted" {
+  description = "Specifies whether the DB cluster is encrypted."
+  type        = bool
+  default     = true
+}
+
+variable "skip_final_snapshot" {
+  description = "Determines whether a final DB snapshot is created before the DB instance is deleted."
+  type        = bool
+  default     = true
+}
+
+variable "publicly_accessible" {
+  description = "Boolean indicating whether the DB instance is publicly accessible."
+  type        = bool
+  default     = false
+}
+
+variable "tags" {
+  description = "A map of tags to assign to the resource."
+  type        = map(string)
+  default     = {}
+}
+
+
